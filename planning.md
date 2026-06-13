@@ -107,9 +107,9 @@ For each tool, describe the specific failure mode you're handling and what the a
 
 | Tool | Failure mode | Agent response |
 |------|-------------|----------------|
-| search_listings | No results match the query | Returns an empty list (never raises). The planning loop detects the empty list, sets `session["error"]` to a "no matches found" message, and returns early without calling `suggest_outfit` or `create_fit_card`. |
-| suggest_outfit | Wardrobe is empty | Detects that `wardrobe["items"]` is empty and falls back to a general-styling prompt, returning non-empty general advice for the item instead of named-piece outfits. Never returns an empty string or raises. |
-| create_fit_card | Outfit input is missing or incomplete | Guards against an empty or whitespace-only `outfit` string and returns a descriptive error-message string instead of calling the LLM. Never raises an exception. |
+| search_listings | No results match the query | Returns `[]` (never raises). The loop sets `session["error"]` to an actionable message and stops before the other tools — e.g. *"No matches for 'designer ballgown under $5'. Try raising your price or using broader terms like 'dress'."* It does **not** call `suggest_outfit` or `create_fit_card`. |
+| suggest_outfit | Wardrobe is empty | Detects `wardrobe["items"]` is empty and returns general styling advice instead of named-piece outfits (never empty, never raises) — e.g. *"Your closet's empty, so here's how to style this on its own: pair it with neutral bottoms and chunky sneakers, and let the graphic tee be the statement piece."* |
+| create_fit_card | Outfit input is missing or incomplete | Guards against an empty or whitespace-only `outfit` and returns an actionable string instead of calling the LLM (never raises) — e.g. *"Couldn't write a fit card — no outfit was generated. Try searching again so I have a look to caption."* |
 
 ---
 
