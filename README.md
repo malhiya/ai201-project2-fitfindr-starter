@@ -129,27 +129,27 @@ Each tool handles its own most likely failure so the agent stays predictable. On
 
 When nothing matches, the tool returns an empty list rather than raising. The planning loop treats this as a stop condition, writes a message into `session["error"]`, and skips the other two tools.
 
-**Concrete example from testing.** The query "designer ballgown size XXS under $5" parses into description "designer ballgown", size "XXS", and max_price 5.0. No listing carries that size at that price, so `search_listings` returns an empty list and the run ends early with this message:
+**Concrete example from testing.**
 
-```
-No matches for 'designer ballgown' — try dropping the size 'XXS', a higher price, or broader terms.
-```
-
-In that run `session["outfit_suggestion"]` and `session["fit_card"]` both stayed None, which confirms the model based tools never ran.
+![search_listings returns an empty result and the run ends early](search_listings_empty_list.png)
 
 ### suggest_outfit, empty wardrobe
 
 When `wardrobe["items"]` is empty, the tool does not fail or return a blank string. It switches to general styling advice for the item on its own. The planning loop does not need special handling, it always receives a usable outfit string.
 
+![suggest_outfit gives general styling advice when the wardrobe is empty](suggest_outfit_empty_wardrobe.png)
+
 ### create_fit_card, missing outfit
 
 The tool checks for an empty or whitespace only outfit string before calling the model. If it finds one, it returns a short message such as "Couldn't write a fit card — no outfit was generated" instead of producing a broken caption. This protects the final step if anything upstream produced nothing.
 
+![create_fit_card returns an error message instead of calling the model on an empty outfit](create_fit_card_empty_string.png)
+
 ## Spec Reflection
 
-The implementation follows the plan in `planning.md` closely. The three tools, the linear planning loop, the single session dict, and the single early exit on empty search results all match what was designed up front. Writing the spec first made the loop simple to build, since each step already had a clear input, output, and failure behavior.
+The build follows `planning.md` closely. The three tools, the linear loop, the single session dict, and the early exit on empty results all match the plan. Writing the spec first helped because each step already had a clear input, output, and failure behavior.
 
-One thing testing revealed that the spec did not predict is how the search ranks results. The plan assumed the query "vintage graphic tee under $30" would surface a Y2K Baby Tee first. In real runs the top result was a bootleg graphic tee, because the scorer matches keywords as plain substrings and does not drop very short words. With a long natural language query this lets common letters and small words match many listings, which adds noise to the ranking. The search still returns relevant items and still returns an empty list when filters are too strict, so the agent behaves correctly, but the relevance scoring is the clearest place the current build could be tightened in a future pass.
+The implementation also diverged in one place. The plan expected "vintage graphic tee under $30" to return a Y2K Baby Tee first, but the top result was a bootleg graphic tee. This happens because the search matches keywords as plain substrings and keeps very short words, so common letters match many listings and add noise to the ranking. The agent still behaves correctly, but the scoring is the clearest thing to improve next.
 
 ## AI Usage
 

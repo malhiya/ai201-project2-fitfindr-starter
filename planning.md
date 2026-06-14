@@ -107,9 +107,9 @@ For each tool, describe the specific failure mode you're handling and what the a
 
 | Tool | Failure mode | Agent response |
 |------|-------------|----------------|
-| search_listings | No results match the query | Returns `[]` (never raises). The loop sets `session["error"]` to an actionable message and stops before the other tools — e.g. *"No matches for 'designer ballgown under $5'. Try raising your price or using broader terms like 'dress'."* It does **not** call `suggest_outfit` or `create_fit_card`. |
-| suggest_outfit | Wardrobe is empty | Detects `wardrobe["items"]` is empty and returns general styling advice instead of named-piece outfits (never empty, never raises) — e.g. *"Your closet's empty, so here's how to style this on its own: pair it with neutral bottoms and chunky sneakers, and let the graphic tee be the statement piece."* |
-| create_fit_card | Outfit input is missing or incomplete | Guards against an empty or whitespace-only `outfit` and returns an actionable string instead of calling the LLM (never raises) — e.g. *"Couldn't write a fit card — no outfit was generated. Try searching again so I have a look to caption."* |
+| search_listings | No results match the query | Returns `[]` (never raises). The loop sets `session["error"]` to an actionable message and stops before the other tools. Verified: `search_listings('designer ballgown', size='XXS', max_price=5)` → `[]`. It does **not** call `suggest_outfit` or `create_fit_card`. |
+| suggest_outfit | Wardrobe is empty | Detects `wardrobe["items"]` is empty and returns general styling advice instead of named-piece outfits (never empty, never raises). Verified with `get_empty_wardrobe()` on the Y2K baby tee — it returns advice with no `w_***` references, e.g. *"That Y2K baby tee is adorable… Since it's a fitted, cropped graphic tee, you'll want to balance it out with some flowy or high-waisted bottoms. **Outfit 1: Casual Day Out** — Pair the butterfly tee with high-waisted, light-washed jeans and Converse… **Outfit 2: Garden Party Chic** — try a flowy, pastel-colored skirt and sandals…"* |
+| create_fit_card | Outfit input is missing or incomplete | Guards against an empty or whitespace-only `outfit` and returns an actionable string instead of calling the LLM (never raises). Verified: `create_fit_card('', results[0])` → *"Couldn't write a fit card — no outfit was generated. Try searching again so I have a look to caption."* |
 
 ---
 
