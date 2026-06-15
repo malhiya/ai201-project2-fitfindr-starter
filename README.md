@@ -103,7 +103,7 @@ The planning loop lives in `run_agent` in `agent.py`. It is a fixed, linear sequ
 
 The important part is the decisions the agent makes, not just the calls:
 
-**Decision 1, how to read the query.** The agent first parses the raw text with `_parse_query`. This uses simple pattern matching to pull out a size (for example "size M") and a price ceiling (for example "under $30" becomes 30.0), and treats whatever text is left as the search description. The choice to parse with patterns instead of asking the model keeps this step fast, free, and predictable, and it stores the result in `session["parsed"]`.
+**Decision 1, how to read the query.** The agent first parses the raw text with `_parse_query`. This uses simple pattern matching to pull out a size (for example "size M", or a bare word like "medium", which is normalized to the dataset's token "M") and a price ceiling (for example "under $30" becomes 30.0), and treats whatever text is left as the search description. The choice to parse with patterns instead of asking the model keeps this step fast, free, and predictable, and it stores the result in `session["parsed"]`.
 
 **Decision 2, whether to continue at all.** After `search_listings` runs, the agent looks at how many results came back. This is the one real branch in the whole loop. If the list is empty, the agent stops here. It writes a helpful message into `session["error"]` and returns immediately, so the two model based tools never run on empty input. If the list has matches, the agent picks the top ranked result as `session["selected_item"]` and keeps going.
 
@@ -150,6 +150,8 @@ The tool checks for an empty or whitespace only outfit string before calling the
 The build follows `planning.md` closely. The three tools, the linear loop, the single session dict, and the early exit on empty results all match the plan. Writing the spec first helped because each step already had a clear input, output, and failure behavior.
 
 The implementation also diverged in one place. The plan expected "vintage graphic tee under $30" to return a Y2K Baby Tee first, but the top result was a bootleg graphic tee. This happens because the search matches keywords as plain substrings and keeps very short words, so common letters match many listings and add noise to the ranking. The agent still behaves correctly, but the scoring is the clearest thing to improve next.
+
+A second issue surfaced during testing. The query parser only recognized a size when the literal word "size" preceded it (for example "size M"), so "a medium graphic tee" parsed with no size at all and the filter was skipped. Even when a size word was captured, it was passed through as-is ("MEDIUM"), which never matched the dataset's abbreviated sizes ("M", "S/M"), so every result was filtered out. The fix recognizes bare size words and normalizes them to the dataset's tokens ("medium" → "M") before filtering.
 
 ## AI Usage
 

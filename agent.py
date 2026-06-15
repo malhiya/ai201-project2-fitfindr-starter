@@ -25,6 +25,28 @@ from tools import search_listings, suggest_outfit, create_fit_card
 
 # ── query parsing ───────────────────────────────────────────────────────────────
 
+# Maps the size words shoppers actually type to the abbreviations the listings
+# dataset stores (e.g. "M", "M/L", "S/M"). Keys are matched case-insensitively;
+# values are the canonical tokens we filter on. Single letters (S/M/L/XL...) are
+# already canonical, so only the spelled-out words need an entry.
+_SIZE_WORDS = {
+    "extra small": "XS",
+    "xsmall": "XS",
+    "small": "S",
+    "medium": "M",
+    "med": "M",
+    "large": "L",
+    "extra large": "XL",
+    "xlarge": "XL",
+    "extra extra large": "XXL",
+}
+
+
+def _normalize_size(raw: str) -> str:
+    """Map a parsed size token to the dataset's abbreviation ("medium" → "M")."""
+    return _SIZE_WORDS.get(raw.strip().lower(), raw.strip().upper())
+
+
 def _parse_query(query: str) -> dict:
     """
     Extract a search description, an optional size, and an optional max_price
@@ -36,7 +58,8 @@ def _parse_query(query: str) -> dict:
     remaining words to search_listings as the description, since search_listings
     already scores by keyword overlap and ignores noise words.
 
-        size:        "size M", "size: L"  → "M" / "L"   (None if absent)
+        size:        "size M", "size: L", or a bare word like "medium"/"large"
+                     → normalized to the dataset's token ("M" / "L"). None if absent.
         max_price:   "under $30", "below 25", "<$40"     (None if absent)
         description: the query with the size/price phrases stripped out
 
@@ -57,14 +80,29 @@ def _parse_query(query: str) -> dict:
         max_price = float(amount)
         text = text[: price_match.start()] + text[price_match.end() :]
 
-    # size — "size M", "size: L", "in size XS".
+    # size — explicit "size M" / "size: L" / "in size XS", otherwise a bare size
+    # word like "medium" / "large". Whichever matches is normalized to the
+    # dataset's token (e.g. "medium" → "M") so the substring filter in
+    # search_listings actually lines up with stored sizes ("M", "S/M", ...).
     size = None
     size_match = re.search(
         r"\bsize\s*:?\s*([A-Za-z0-9/]+)", text, flags=re.IGNORECASE
     )
     if size_match:
-        size = size_match.group(1).upper()
+        size = _normalize_size(size_match.group(1))
         text = text[: size_match.start()] + text[size_match.end() :]
+    else:
+        # No "size" keyword — look for a bare spelled-out size word. Longer
+        # phrases first ("extra large" before "large") to avoid partial matches.
+        words = sorted(_SIZE_WORDS, key=len, reverse=True)
+        word_match = re.search(
+            r"\b(" + "|".join(re.escape(w) for w in words) + r")\b",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if word_match:
+            size = _normalize_size(word_match.group(1))
+            text = text[: word_match.start()] + text[word_match.end() :]
 
     # description — leftover text, cleaned of stray punctuation/whitespace.
     description = re.sub(r"\s+", " ", text).strip(" ,.;:")
